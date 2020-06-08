@@ -935,68 +935,72 @@ class Sheet(BaseObject):
                 else: # BIFF2
                     rowx, colx, cell_attr,  result_str, flags = local_unpack('<HH3s8sB', data[0:16])
                     xf_index =  self.fixed_BIFF2_xfindex(cell_attr, rowx, colx)
-                if blah_formulas: # testing formula dumper
-                    #### XXXX FIXME
-                    fprintf(self.logfile, "FORMULA: rowx=%d colx=%d\n", rowx, colx)
-                    fmlalen = local_unpack("<H", data[20:22])[0]
-                    decompile_formula(bk, data[22:], fmlalen, FMLA_TYPE_CELL,
-                        browx=rowx, bcolx=colx, blah=1, r1c1=r1c1)
-                if result_str[6:8] == b"\xFF\xFF":
-                    first_byte = BYTES_ORD(result_str[0])
-                    if first_byte == 0:
-                        # need to read next record (STRING)
-                        gotstring = 0
-                        # if flags & 8:
-                        if 1: # "flags & 8" applies only to SHRFMLA
-                            # actually there's an optional SHRFMLA or ARRAY etc record to skip over
-                            rc2, data2_len, data2 = bk.get_record_parts()
-                            if rc2 == XL_STRING or rc2 == XL_STRING_B2:
-                                gotstring = 1
-                            elif rc2 == XL_ARRAY:
-                                row1x, rownx, col1x, colnx, array_flags, tokslen = \
-                                    local_unpack("<HHBBBxxxxxH", data2[:14])
-                                if blah_formulas:
-                                    fprintf(self.logfile, "ARRAY: %d %d %d %d %d\n",
-                                        row1x, rownx, col1x, colnx, array_flags)
-                                    # dump_formula(bk, data2[14:], tokslen, bv, reldelta=0, blah=1)
-                            elif rc2 == XL_SHRFMLA:
-                                row1x, rownx, col1x, colnx, nfmlas, tokslen = \
-                                    local_unpack("<HHBBxBH", data2[:10])
-                                if blah_formulas:
-                                    fprintf(self.logfile, "SHRFMLA (sub): %d %d %d %d %d\n",
-                                        row1x, rownx, col1x, colnx, nfmlas)
-                                    decompile_formula(bk, data2[10:], tokslen, FMLA_TYPE_SHARED,
-                                        blah=1, browx=rowx, bcolx=colx, r1c1=r1c1)
-                            elif rc2 not in XL_SHRFMLA_ETC_ETC:
-                                raise XLRDError(
-                                    "Expected SHRFMLA, ARRAY, TABLEOP* or STRING record; found 0x%04x" % rc2)
-                            # if DEBUG: print "gotstring:", gotstring
-                        # now for the STRING record
-                        if not gotstring:
-                            rc2, _unused_len, data2 = bk.get_record_parts()
-                            if rc2 not in (XL_STRING, XL_STRING_B2):
-                                raise XLRDError("Expected STRING record; found 0x%04x" % rc2)
-                        # if DEBUG: print "STRING: data=%r BIFF=%d cp=%d" % (data2, self.biff_version, bk.encoding)
-                        strg = self.string_record_contents(data2)
-                        self.put_cell(rowx, colx, XL_CELL_TEXT, strg, xf_index)
-                        # if DEBUG: print "FORMULA strg %r" % strg
-                    elif first_byte == 1:
-                        # boolean formula result
-                        value = BYTES_ORD(result_str[2])
-                        self_put_cell(rowx, colx, XL_CELL_BOOLEAN, value, xf_index)
-                    elif first_byte == 2:
-                        # Error in cell
-                        value = BYTES_ORD(result_str[2])
-                        self_put_cell(rowx, colx, XL_CELL_ERROR, value, xf_index)
-                    elif first_byte == 3:
-                        # empty ... i.e. empty (zero-length) string, NOT an empty cell.
-                        self_put_cell(rowx, colx, XL_CELL_TEXT, "", xf_index)
-                    else:
-                        raise XLRDError("unexpected special case (0x%02x) in FORMULA" % first_byte)
-                else:
-                    # it is a number
-                    d = local_unpack('<d', result_str)[0]
-                    self_put_cell(rowx, colx, None, d, xf_index)
+
+                # Ignore formulas; treat the cell as empty string (not empty).
+                self_put_cell(rowx, colx, XL_CELL_TEXT, "", xf_index)
+
+                # if blah_formulas: # testing formula dumper
+                #     #### XXXX FIXME
+                #     fprintf(self.logfile, "FORMULA: rowx=%d colx=%d\n", rowx, colx)
+                #     fmlalen = local_unpack("<H", data[20:22])[0]
+                #     decompile_formula(bk, data[22:], fmlalen, FMLA_TYPE_CELL,
+                #         browx=rowx, bcolx=colx, blah=1, r1c1=r1c1)
+                # if result_str[6:8] == b"\xFF\xFF":
+                #     first_byte = BYTES_ORD(result_str[0])
+                #     if first_byte == 0:
+                #         # need to read next record (STRING)
+                #         gotstring = 0
+                #         # if flags & 8:
+                #         if 1: # "flags & 8" applies only to SHRFMLA
+                #             # actually there's an optional SHRFMLA or ARRAY etc record to skip over
+                #             rc2, data2_len, data2 = bk.get_record_parts()
+                #             if rc2 == XL_STRING or rc2 == XL_STRING_B2:
+                #                 gotstring = 1
+                #             elif rc2 == XL_ARRAY:
+                #                 row1x, rownx, col1x, colnx, array_flags, tokslen = \
+                #                     local_unpack("<HHBBBxxxxxH", data2[:14])
+                #                 if blah_formulas:
+                #                     fprintf(self.logfile, "ARRAY: %d %d %d %d %d\n",
+                #                         row1x, rownx, col1x, colnx, array_flags)
+                #                     # dump_formula(bk, data2[14:], tokslen, bv, reldelta=0, blah=1)
+                #             elif rc2 == XL_SHRFMLA:
+                #                 row1x, rownx, col1x, colnx, nfmlas, tokslen = \
+                #                     local_unpack("<HHBBxBH", data2[:10])
+                #                 if blah_formulas:
+                #                     fprintf(self.logfile, "SHRFMLA (sub): %d %d %d %d %d\n",
+                #                         row1x, rownx, col1x, colnx, nfmlas)
+                #                     decompile_formula(bk, data2[10:], tokslen, FMLA_TYPE_SHARED,
+                #                         blah=1, browx=rowx, bcolx=colx, r1c1=r1c1)
+                #             elif rc2 not in XL_SHRFMLA_ETC_ETC:
+                #                 raise XLRDError(
+                #                     "Expected SHRFMLA, ARRAY, TABLEOP* or STRING record; found 0x%04x" % rc2)
+                #             # if DEBUG: print "gotstring:", gotstring
+                #         # now for the STRING record
+                #         if not gotstring:
+                #             rc2, _unused_len, data2 = bk.get_record_parts()
+                #             if rc2 not in (XL_STRING, XL_STRING_B2):
+                #                 raise XLRDError("Expected STRING record; found 0x%04x" % rc2)
+                #         # if DEBUG: print "STRING: data=%r BIFF=%d cp=%d" % (data2, self.biff_version, bk.encoding)
+                #         strg = self.string_record_contents(data2)
+                #         self.put_cell(rowx, colx, XL_CELL_TEXT, strg, xf_index)
+                #         # if DEBUG: print "FORMULA strg %r" % strg
+                #     elif first_byte == 1:
+                #         # boolean formula result
+                #         value = BYTES_ORD(result_str[2])
+                #         self_put_cell(rowx, colx, XL_CELL_BOOLEAN, value, xf_index)
+                #     elif first_byte == 2:
+                #         # Error in cell
+                #         value = BYTES_ORD(result_str[2])
+                #         self_put_cell(rowx, colx, XL_CELL_ERROR, value, xf_index)
+                #     elif first_byte == 3:
+                #         # empty ... i.e. empty (zero-length) string, NOT an empty cell.
+                #         self_put_cell(rowx, colx, XL_CELL_TEXT, "", xf_index)
+                #     else:
+                #         raise XLRDError("unexpected special case (0x%02x) in FORMULA" % first_byte)
+                # else:
+                #     # it is a number
+                #     d = local_unpack('<d', result_str)[0]
+                #     self_put_cell(rowx, colx, None, d, xf_index)
             elif rc == XL_BOOLERR:
                 rowx, colx, xf_index, value, is_err = local_unpack('<HHHBB', data[:8])
                 # Note OOo Calc 2.0 writes 9-byte BOOLERR records.
