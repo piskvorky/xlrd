@@ -39,6 +39,7 @@ def open_workbook(filename=None,
                   formatting_info=False,
                   on_demand=False,
                   ragged_rows=False,
+                  data_only=True,
                   ignore_workbook_corruption=False
                   ):
     """
@@ -145,6 +146,7 @@ def open_workbook(filename=None,
                 formatting_info=formatting_info,
                 on_demand=on_demand,
                 ragged_rows=ragged_rows,
+                data_only=data_only,
             )
             return bk
         if 'xl/workbook.bin' in component_names:
@@ -165,6 +167,7 @@ def open_workbook(filename=None,
         on_demand=on_demand,
         ragged_rows=ragged_rows,
         ignore_workbook_corruption=ignore_workbook_corruption,
+        data_only=data_only,
     )
     return bk
 
