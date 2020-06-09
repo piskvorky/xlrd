@@ -72,7 +72,8 @@ def open_workbook_xls(filename=None,
                       file_contents=None,
                       encoding_override=None,
                       formatting_info=False, on_demand=False, ragged_rows=False,
-                      ignore_workbook_corruption=False):
+                      ignore_workbook_corruption=False,
+                      data_only=True):
     t0 = perf_counter()
     if TOGGLE_GC:
         orig_gc_enabled = gc.isenabled()
@@ -87,6 +88,7 @@ def open_workbook_xls(filename=None,
             formatting_info=formatting_info,
             on_demand=on_demand,
             ragged_rows=ragged_rows,
+            data_only=data_only,
             ignore_workbook_corruption=ignore_workbook_corruption
         )
         t1 = perf_counter()
@@ -619,6 +621,7 @@ class Book(BaseObject):
                      formatting_info=False,
                      on_demand=False,
                      ragged_rows=False,
+                     data_only=True,
                      ignore_workbook_corruption=False
                      ):
         # DEBUG = 0
@@ -628,6 +631,7 @@ class Book(BaseObject):
         self.encoding_override = encoding_override
         self.formatting_info = formatting_info
         self.on_demand = on_demand
+        self.data_only = data_only
         self.ragged_rows = ragged_rows
 
         if not file_contents:

@@ -789,7 +789,8 @@ def open_workbook_2007_xml(zf,
                            use_mmap=0,
                            formatting_info=0,
                            on_demand=0,
-                           ragged_rows=0):
+                           ragged_rows=0,
+                           data_only=1):
     ensure_elementtree_imported(verbosity, logfile)
     bk = Book()
     bk.logfile = logfile
@@ -799,6 +800,7 @@ def open_workbook_2007_xml(zf,
         raise NotImplementedError("formatting_info=True not yet implemented")
     bk.use_mmap = False #### Not supported initially
     bk.on_demand = on_demand
+    bk.data_only = data_only
     if on_demand:
         if verbosity:
             print("WARNING *** on_demand=True not yet implemented; falling back to False", file=bk.logfile)
