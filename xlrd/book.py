@@ -1452,7 +1452,7 @@ def unpack_SST_table(datatab, nstrings):
                 rawstrg = data[pos:pos+2*charsavail]
                 # if DEBUG: print "SST U16: nchars=%d pos=%d rawstrg=%r" % (nchars, pos, rawstrg)
                 try:
-                    accstrg += unicode(rawstrg, "utf_16_le", 'replace')
+                    accstrg += unicode(rawstrg, "utf_16_le", 'surrogatepass')
                 except:
                     # print "SST U16: nchars=%d pos=%d rawstrg=%r" % (nchars, pos, rawstrg)
                     # Probable cause: dodgy data e.g. unfinished surrogate pair.
