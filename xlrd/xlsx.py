@@ -548,6 +548,11 @@ class X12Sheet(X12General):
         self_do_row = self.do_row
         for event, elem in ET.iterparse(stream):
             if elem.tag == row_tag:
+                # Stop on a gap of more than 100 empty rows: stray cells far beyond
+                # the real data would otherwise allocate millions of empty row objects.
+                r_attr = elem.get('r')
+                if r_attr is not None and int(r_attr) - 1 - self.rowx > 100:
+                    break
                 self_do_row(elem)
                 elem.clear() # destroy all child elements (cells)
             elif elem.tag == U_SSML12 + "dimension":
@@ -638,6 +643,7 @@ class X12Sheet(X12General):
         assert 0 <= self.rowx < X12_MAX_ROWS
         rowx = self.rowx
         colx = -1
+        prev_colx = -1
         if self.verbosity >= 3:
             self.dumpout("<row> row_number=%r rowx=%d explicit=%d",
                 row_number, self.rowx, explicit_row_number)
@@ -670,6 +676,11 @@ class X12Sheet(X12General):
                     raise Exception('Unexpected character %r in cell name %r' % (c, cell_name))
                 if explicit_row_number and cell_name[charx:] != row_number:
                     raise Exception('cell name %r but row number is %r' % (cell_name, row_number))
+            # Stop on a gap of more than 100 empty columns: stray cells far to the
+            # right would otherwise widen the row with thousands of empty entries.
+            if colx - prev_colx > 100:
+                break
+            prev_colx = colx
             xf_index = int(cell_elem.get('s', '0'))
             cell_type = cell_elem.get('t', 'n')
             tvalue = None
@@ -782,6 +793,34 @@ class X12Sheet(X12General):
     }
     augment_keys(tag2meth, U_SSML12)
 
+def _parse_xlsx_sheet(bk, sheetx, sheet):
+    """Parse one sheet's XML into an already-created Sheet object."""
+    zf = bk._xlsx_zf
+    component_names = bk._xlsx_component_names
+    fname = bk._xlsx_sheet_targets[sheetx]
+    x12sheet = X12Sheet(sheet, bk._xlsx_logfile, bk._xlsx_verbosity)
+    heading = "Sheet %r (sheetx=%d) from %r" % (sheet.name, sheetx, fname)
+    zflo = zf.open(component_names[fname])
+    x12sheet.process_stream(zflo, heading)
+    del zflo
+
+    rels_fname = 'xl/worksheets/_rels/%s.rels' % fname.rsplit('/', 1)[-1]
+    if rels_fname in component_names:
+        zfrels = zf.open(rels_fname)
+        x12sheet.process_rels(zfrels)
+        del zfrels
+
+    for relid, reltype in x12sheet.relid2reltype.items():
+        if reltype == 'comments':
+            comments_fname = x12sheet.relid2path.get(relid)
+            if comments_fname and comments_fname in component_names:
+                comments_stream = zf.open(comments_fname)
+                x12sheet.process_comments_stream(comments_stream)
+                del comments_stream
+
+    sheet.tidy_dimensions()
+
+
 def open_workbook_2007_xml(zf,
                            component_names,
                            logfile=sys.stdout,
@@ -801,11 +840,9 @@ def open_workbook_2007_xml(zf,
     bk.use_mmap = False #### Not supported initially
     bk.on_demand = on_demand
     bk.data_only = data_only
-    if on_demand:
-        if verbosity:
-            print("WARNING *** on_demand=True not yet implemented; falling back to False", file=bk.logfile)
-        bk.on_demand = False
     bk.ragged_rows = ragged_rows
+    bk._xlsx_logfile = logfile
+    bk._xlsx_verbosity = verbosity
 
     x12book = X12Book(bk, logfile, verbosity)
     zflo = zf.open(component_names['xl/_rels/workbook.xml.rels'])
@@ -839,29 +876,28 @@ def open_workbook_2007_xml(zf,
             x12sst.process_stream(zflo, 'SST')
             del zflo
 
-    for sheetx in range(bk.nsheets):
-        fname = x12book.sheet_targets[sheetx]
-        zflo = zf.open(component_names[fname])
-        sheet = bk._sheet_list[sheetx]
-        x12sheet = X12Sheet(sheet, logfile, verbosity)
-        heading = "Sheet %r (sheetx=%d) from %r" % (sheet.name, sheetx, fname)
-        x12sheet.process_stream(zflo, heading)
-        del zflo
+    bk._xlsx_zf = zf
+    bk._xlsx_component_names = component_names
+    bk._xlsx_sheet_targets = x12book.sheet_targets
 
-        rels_fname = 'xl/worksheets/_rels/%s.rels' % fname.rsplit('/', 1)[-1]
-        if rels_fname in component_names:
-            zfrels = zf.open(rels_fname)
-            x12sheet.process_rels(zfrels)
-            del zfrels
+    if on_demand:
+        # Defer sheet parsing until the sheet is first accessed via sheet_by_index().
+        # Save the pre-created Sheet stubs and reset _sheet_list to None so that
+        # Book.sheet_by_index() calls Book.get_sheet() → bk._xlsx_get_sheet().
+        bk._xlsx_sheet_objects = list(bk._sheet_list)
+        bk._sheet_list = [None] * bk.nsheets
 
-        for relid, reltype in x12sheet.relid2reltype.items():
-            if reltype == 'comments':
-                comments_fname = x12sheet.relid2path.get(relid)
-                if comments_fname and comments_fname in component_names:
-                    comments_stream = zf.open(comments_fname)
-                    x12sheet.process_comments_stream(comments_stream)
-                    del comments_stream
+        def _xlsx_get_sheet(sheetx):
+            sheet = bk._xlsx_sheet_objects[sheetx]
+            _parse_xlsx_sheet(bk, sheetx, sheet)
+            bk._sheet_list[sheetx] = sheet
+            return sheet
 
-        sheet.tidy_dimensions()
+        bk._xlsx_get_sheet = _xlsx_get_sheet
+    else:
+        for sheetx in range(bk.nsheets):
+            _parse_xlsx_sheet(bk, sheetx, bk._sheet_list[sheetx])
+        bk._xlsx_zf.close()
+        bk._xlsx_zf = None
 
     return bk

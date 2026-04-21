@@ -561,6 +561,10 @@ class Book(BaseObject):
         self.filestr = None
         self._sharedstrings = None
         self._rich_text_runlist_map = None
+        xlsx_zf = getattr(self, '_xlsx_zf', None)
+        if xlsx_zf is not None:
+            xlsx_zf.close()
+            self._xlsx_zf = None
 
     def __enter__(self):
         return self
@@ -725,6 +729,8 @@ class Book(BaseObject):
     def get_sheet(self, sh_number, update_pos=True):
         if self._resources_released:
             raise XLRDError("Can't load sheets after releasing resources.")
+        if hasattr(self, '_xlsx_get_sheet'):
+            return self._xlsx_get_sheet(sh_number)
         if update_pos:
             self._position = self._sh_abs_posn[sh_number]
         self.getbof(XL_WORKSHEET)
