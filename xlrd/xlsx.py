@@ -5,6 +5,7 @@
 
 from __future__ import print_function, unicode_literals
 
+import logging
 import re
 import sys
 from os.path import join, normpath
@@ -20,6 +21,7 @@ from .timemachine import *
 
 DEBUG = 0
 
+logger = logging.getLogger(__name__)
 
 DLF = sys.stdout # Default Log File
 
@@ -552,6 +554,7 @@ class X12Sheet(X12General):
                 # the real data would otherwise allocate millions of empty row objects.
                 r_attr = elem.get('r')
                 if r_attr is not None and self.rowx >= 0 and int(r_attr) - 1 - self.rowx > 100:
+                    logger.info("sheet %r: clipping rows after row %d (next explicit row %s)", self.sheet.name, self.rowx + 1, r_attr)
                     break
                 self_do_row(elem)
                 elem.clear() # destroy all child elements (cells)
@@ -679,6 +682,7 @@ class X12Sheet(X12General):
             # Stop on a gap of more than 100 empty columns: stray cells far to the
             # right would otherwise widen the row with thousands of empty entries.
             if prev_colx >= 0 and colx - prev_colx > 100:
+                logger.info("sheet %r row %d: clipping columns after col %d (next explicit col %d)", self.sheet.name, rowx + 1, prev_colx + 1, colx + 1)
                 break
             prev_colx = colx
             xf_index = int(cell_elem.get('s', '0'))
