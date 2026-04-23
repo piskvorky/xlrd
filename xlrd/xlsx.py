@@ -882,13 +882,19 @@ def open_workbook_2007_xml(zf,
 
     if on_demand:
         # Defer sheet parsing until the sheet is first accessed via sheet_by_index().
-        # Save the pre-created Sheet stubs and reset _sheet_list to None so that
-        # Book.sheet_by_index() calls Book.get_sheet() → bk._xlsx_get_sheet().
-        bk._xlsx_sheet_objects = list(bk._sheet_list)
+        # Reset _sheet_list to None entries so that Book.sheet_by_index() calls
+        # Book.get_sheet() → bk._xlsx_get_sheet().
         bk._sheet_list = [None] * bk.nsheets
 
         def _xlsx_get_sheet(sheetx):
-            sheet = bk._xlsx_sheet_objects[sheetx]
+            sheet = bk._sheet_list[sheetx]
+            if sheet is not None:
+                return sheet
+            # Always create a fresh Sheet so that unload_sheet() + reload never
+            # appends cells into an already-populated object.
+            sheet = Sheet(bk, position=None, name=bk._sheet_names[sheetx], number=sheetx)
+            sheet.utter_max_rows = X12_MAX_ROWS
+            sheet.utter_max_cols = X12_MAX_COLS
             _parse_xlsx_sheet(bk, sheetx, sheet)
             bk._sheet_list[sheetx] = sheet
             return sheet
