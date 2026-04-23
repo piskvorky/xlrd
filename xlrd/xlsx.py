@@ -551,7 +551,7 @@ class X12Sheet(X12General):
                 # Stop on a gap of more than 100 empty rows: stray cells far beyond
                 # the real data would otherwise allocate millions of empty row objects.
                 r_attr = elem.get('r')
-                if r_attr is not None and int(r_attr) - 1 - self.rowx > 100:
+                if r_attr is not None and self.rowx >= 0 and int(r_attr) - 1 - self.rowx > 100:
                     break
                 self_do_row(elem)
                 elem.clear() # destroy all child elements (cells)
@@ -678,7 +678,7 @@ class X12Sheet(X12General):
                     raise Exception('cell name %r but row number is %r' % (cell_name, row_number))
             # Stop on a gap of more than 100 empty columns: stray cells far to the
             # right would otherwise widen the row with thousands of empty entries.
-            if colx - prev_colx > 100:
+            if prev_colx >= 0 and colx - prev_colx > 100:
                 break
             prev_colx = colx
             xf_index = int(cell_elem.get('s', '0'))
