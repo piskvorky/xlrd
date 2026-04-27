@@ -290,8 +290,13 @@ class CompDoc(object):
             # nothing to check against
             while s >= 0:
                 if seen_id is not None:
+                    if s >= len(self.seen):
+                        raise CompDocError(
+                            "Invalid OLE2 file: stream %r references sector %d but file only has %d sectors"
+                            % (name, s, len(self.seen))
+                        )
                     if self.seen[s]:
-                        raise CompDocError("%s corruption: seen[%d] == %d" % (name, s, self.seen[s]))
+                        raise CompDocError("Invalid OLE2 file: %s corruption: seen[%d] == %d" % (name, s, self.seen[s]))
                     self.seen[s] = seen_id
                 start_pos = base + s * sec_size
                 sectors.append(mem[start_pos:start_pos+sec_size])
@@ -299,7 +304,7 @@ class CompDoc(object):
                     s = sat[s]
                 except IndexError:
                     raise CompDocError(
-                        "OLE2 stream %r: sector allocation table invalid entry (%d)" %
+                        "Invalid OLE2 file: stream %r has invalid sector allocation table entry (%d)" %
                         (name, s)
                     )
             assert s == EOCSID
@@ -307,8 +312,13 @@ class CompDoc(object):
             todo = size
             while s >= 0:
                 if seen_id is not None:
+                    if s >= len(self.seen):
+                        raise CompDocError(
+                            "Invalid OLE2 file: stream %r references sector %d but file only has %d sectors"
+                            % (name, s, len(self.seen))
+                        )
                     if self.seen[s]:
-                        raise CompDocError("%s corruption: seen[%d] == %d" % (name, s, self.seen[s]))
+                        raise CompDocError("Invalid OLE2 file: %s corruption: seen[%d] == %d" % (name, s, self.seen[s]))
                     self.seen[s] = seen_id
                 start_pos = base + s * sec_size
                 grab = sec_size
@@ -320,7 +330,7 @@ class CompDoc(object):
                     s = sat[s]
                 except IndexError:
                     raise CompDocError(
-                        "OLE2 stream %r: sector allocation table invalid entry (%d)" %
+                        "Invalid OLE2 file: stream %r has invalid sector allocation table entry (%d)" %
                         (name, s)
                     )
             assert s == EOCSID
@@ -423,16 +433,21 @@ class CompDoc(object):
         tot_found = 0
         found_limit = (expected_stream_size + sec_size - 1) // sec_size
         while s >= 0:
+            if s >= len(self.seen):
+                raise CompDocError(
+                    "Invalid OLE2 file: stream %r references sector %d but file only has %d sectors"
+                    % (qname, s, len(self.seen))
+                )
             if self.seen[s]:
                 if not self.ignore_workbook_corruption:
                     print("_locate_stream(%s): seen" % qname, file=self.logfile); dump_list(self.seen, 20, self.logfile)
-                    raise CompDocError("%s corruption: seen[%d] == %d" % (qname, s, self.seen[s]))
+                    raise CompDocError("Invalid OLE2 file: %s corruption: seen[%d] == %d" % (qname, s, self.seen[s]))
             self.seen[s] = seen_id
             tot_found += 1
             if tot_found > found_limit:
                 # Note: expected size rounded up to higher sector
                 raise CompDocError(
-                    "%s: size exceeds expected %d bytes; corrupt?"
+                    "Invalid OLE2 file: stream %r size exceeds expected %d bytes; corrupt?"
                     % (qname, found_limit * sec_size)
                 )
             if s == p+1:
